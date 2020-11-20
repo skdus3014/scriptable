@@ -1,117 +1,177 @@
-var id="9"
-var s="39301"
-var local="en"
-// var matchdaysUrl ="https://feedmonster.onefootball.com/feeds/il/en/competitions/1/39285/matchdaysOverview.json"
-// zh en
+// Variables used by Scriptable. 
+// These must be at the very top of the file. Do not edit. 
+// icon-color: deep-gray; icon-glyph: futbol; 
+const teamId = 133610; 
+const teamDetailUrl = "https://www.thesportsdb.com/api/v1/json/1/lookupteam.php?id="; 
 
-var title=`Team                            P       W/D/L      Goals      Points`
-if(Device.locale() == "zh_CN"){
-title=`球队                              赛   胜/平/负     进/失      积分`
-local="zh"
-}
-if (args.widgetParameter == "laliga") {
-//laliga  
-  id = 10
-  s=39319
-}else if (args.widgetParameter == "bl") {
-//bundesliga  
-id=1
-s=39285
-} else if (args.widgetParameter == "sa") {
-//serie A
-id=13
-s=39325
-}else if (args.widgetParameter == "lue") {
-//ligue1 uber eats
-   id=23
-  s=39245
-}
-//You can find more ids and s value here:https://github.com/Juniorchen2012/scriptable/blob/master/footballLeagueData
-var url=`https://feedmonster.onefootball.com/feeds/il/${local}/competitions/${id}/${s}/standings.json`
-var iconUrl=`https://images.onefootball.com/icons/leagueColoredCompetition/64/${id}.png`
+const leagueDetailUrl = "https://www.thesportsdb.com/api/v1/json/1/lookupleague.php?id=" 
 
-// const requestM = new importModule('Env')()
-const json = await get({ 'url': url })
+const teamUrl = teamDetailUrl + teamId; 
+let r = new Request(teamUrl); 
+let teamDetail = await r.loadJSON(); 
 
-const w = new ListWidget()
-w.backgroundColor = new Color("#36033B")
-const bg = await drawBg(iconUrl)
-w.backgroundImage=bg
-// w.backgroundImage=readBgImage()
-const titlew= w.addText(title)
-titlew.textColor = new Color("#e587ce")
-titlew.font = Font.boldSystemFont(13)
-var i = 0
-for (var item of json.groups[0].ranking) {
-  if (i == 6) { break }
-  var j = 0
-  var total = item.team.name.length
-  const stack = w.addStack()
-  stack.layoutHorizontally()
-  stack.centerAlignContent()
-  const image = await loadImage(`https://images.onefootball.com/icons/teams/56/${item.team.idInternal}.png`)
-  const imgwidget=stack.addImage(image)
-  imgwidget.imageSize=new Size(16, 16)
-const stats=item.team.teamstats
-createTextStack(stack, `${item.team.name}`, 100)
-createTextStack(stack,`${stats.played}`,30)
-  createTextStack(stack, `${stats.won}/${stats.drawn}/${stats.lost}`, 60)
-  createTextStack(stack, `${stats.goalsShot}/${stats.goalsGot}`, 60)
-  createTextStack(stack, `${stats.points}`, 30)
- w.addSpacer(2)
-  i++
-}
-w.presentMedium()
-if (config.runsInWidget) {
-  let widget = w
-  Script.setWidget(widget)
-   Script.complete()
-}
+const widgetSize = config.widgetFamily 
 
-function readBgImage() {
-  let fm = FileManager.iCloud()
-  let dir = fm.documentsDirectory()
-  let filePath = fm.joinPath(dir, "PL.png")
-  return fm.readImage(filePath)
-}
+const maxEvents = widgetSize === "large" ? 4 : 2 
 
-function createTextStack(stack, text, width) {
-  const tmpStack = stack.addStack()
-  tmpStack.size = new Size(width, 20)
-  const widgetText = tmpStack.addText(text)
-  widgetText.font = Font.systemFont(13)
-  //       homeText.textColor = new Color("#e587ce")
-  widgetText.textColor = Color.white()
-  widgetText.textOpacity = 0.6
-  return widgetText
-}
+async function getTeamImg(id) { 
+let teamUrl = teamDetailUrl + id; 
+let req = new Request(teamUrl) 
+let res = await req.loadJSON() 
+let imageUrl = res.teams[0].strTeamBadge + "/preview" 
+let imgReq = new Request(imageUrl) 
+let img = await imgReq.loadImage() 
+return img 
+} 
 
-async function get(opts) {
-      const request = new Request(opts.url)
-      request.headers = {
-        ...opts.headers,
-        ...this.defaultHeaders
-      }
-      var result=await request.loadJSON()
-      console.log(result)
-      return result
-    
-}
+async function getLeagueImg(id) { 
+let leagueUrl = leagueDetailUrl + id; 
+let req = new Request(leagueUrl) 
+let res = await req.loadJSON() 
+let imageUrl = res.leagues[0].strBadge 
+let imgReq = new Request(imageUrl) 
+let img = await imgReq.loadImage() 
+return img 
+} 
 
- async function  loadImage(imgUrl) {
-  let req = new Request(imgUrl)
-  let image = await req.loadImage()
-  return image
+function createDivider() { 
+const drawContext = new DrawContext() 
+drawContext.size = new Size(543, 1) 
+const path = new Path() 
+path.addLine(new Point(1000, 20)) 
+drawContext.addPath(path) 
+drawContext.setStrokeColor(Device.isUsingDarkAppearance() ? new Color("#fff", 1) : new Color("#000000", 1)) 
+drawContext.setLineWidth(1) 
+drawContext.strokePath() 
+return drawContext.getImage() 
 }
+async function createWidget() { 
+const eventsUrl = "https://www.thesportsdb.com/api/v1/json/1/eventsnext.php?id=" + teamId; 
+let req = new Request(eventsUrl); 
+let res = await req.loadJSON(); 
+let events = res.events; 
 
-async function drawBg(iconUrl){
- const image = await loadImage(iconUrl)
-const context =new DrawContext()
-context.size=new Size(300, 200)
-context.opaque=false
-context.respectScreenScale=true
-context.setFillColor(new Color("#36033B"))
-context.fill(new Rect(0,0,300,200))
-context.drawImageInRect(image, new Rect(255, 80, 40, 40))
-return context.getImage()
-}
+let teamImg = await getTeamImg(teamId) 
+
+let w = new ListWidget(); 
+
+w.backgroundColor = Device.isUsingDarkAppearance() ? new Color("#000000", 1) : new Color("#ffffff", 1) 
+w.useDefaultPadding() 
+
+const limitedEvents = events.slice(0, maxEvents) 
+
+const imageSize = widgetSize === "large" ? 32 : 26; 
+
+w.addSpacer() 
+
+if (widgetSize === "large") { 
+
+const teamName = events[0].idHomeTeam == teamId ? events[0].strHomeTeam : events[0].strAwayTeam 
+let titleStack = w.addStack() 
+let title = titleStack.addText(`${teamName}'s upcoming matches`) 
+title.font = Font.boldSystemFont(16); 
+
+w.addSpacer() 
+
+} 
+
+for (let i = 0; i < limitedEvents.length; i++) { 
+let e = events[i] 
+
+if (widgetSize === "large" || i > 0) { 
+w.addSpacer(10) 
+} 
+
+let homeImg = "" 
+let awayImg = "" 
+
+if (e.idHomeTeam == teamId) { 
+homeImg = teamImg 
+awayImg = await getTeamImg(e.idAwayTeam) 
+} else { 
+homeImg = await getTeamImg(e.idHomeTeam) 
+awayImg = teamImg 
+} 
+
+let rowStack = w.addStack() 
+rowStack.centerAlignContent() 
+
+// home team image 
+let homeImageStack = rowStack.addStack(); 
+let homeImage = homeImageStack.addImage(homeImg); 
+homeImage.imageSize = new Size(imageSize, imageSize) 
+homeImageStack.addSpacer(10) 
+
+// home team name 
+let homeNameStack = rowStack.addStack(); 
+let homeName = homeNameStack.addText(e.strHomeTeam); 
+homeName.font = Font.mediumSystemFont(12); 
+homeNameStack.size = new Size(100, 14) 
+homeNameStack.addSpacer() 
+
+let separatorStack = rowStack.addStack(); 
+let separator = separatorStack.addText('-') 
+separator.font = Font.mediumSystemFont(12) 
+separatorStack.size = new Size(24, 12) 
+separatorStack.addSpacer(10) 
+
+// away team name 
+let awayNameStack = rowStack.addStack(); 
+awayNameStack.addSpacer() 
+let awayName = awayNameStack.addText(e.strAwayTeam); 
+awayName.font = Font.mediumSystemFont(12); 
+awayNameStack.size = new Size(100, 14) 
+awayNameStack.addSpacer(10) 
+
+// away team image 
+let awayImageStack = rowStack.addStack(); 
+let awayImage = awayImageStack.addImage(awayImg); 
+awayImage.imageSize = new Size(imageSize, imageSize); 
+
+w.addSpacer(5) 
+
+let infoRowStack = w.addStack() 
+infoRowStack.centerAlignContent() 
+infoRowStack.addSpacer() 
+
+let dateStack = infoRowStack.addStack() 
+const dateFormatter = new DateFormatter() 
+dateFormatter.useMediumDateStyle() 
+dateFormatter.useShortTimeStyle() 
+let parsedDate = new Date(Date.parse(e.strTimestamp)) 
+let formattedDate = dateFormatter.string(parsedDate) 
+
+let date = dateStack.addText(formattedDate) 
+date.font = Font.mediumSystemFont(10) 
+date.textOpacity = 0.5 
+
+dateStack.addSpacer(10) 
+
+//league image 
+if (widgetSize === "large") { 
+let leagueImg = await getLeagueImg(e.idLeague) 
+let leagueImageStack = infoRowStack.addStack() 
+let leagueImage = leagueImageStack.addImage(leagueImg) 
+leagueImage.size = new Size(10, 10) 
+} 
+
+infoRowStack.addSpacer() 
+
+if (i !== maxEvents - 1) { 
+w.addSpacer(10) 
+
+let dividerStack = w.addStack() 
+let divider = dividerStack.addImage(createDivider()) 
+divider.imageOpacity = 0.5 
+} 
+} 
+
+w.addSpacer() 
+
+return w 
+} 
+
+const widget = await createWidget() 
+
+Script.setWidget(widget) 
+Script.complete()
